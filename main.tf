@@ -1,28 +1,12 @@
-variable "public_key" {
-  description = "Public SSH key for EC2"
-  type        = string
-}
-
 provider "aws" {
   region = "ap-south-1"
 }
 
-resource "aws_key_pair" "deployer" {
-  key_name   = "deployer-key"
-  public_key = var.public_key
-}
-
-resource "aws_security_group" "allow_http_ssh" {
-  name = "allow_http_ssh"
+resource "aws_security_group" "web_sg" {
+  name = "allow_http"
 
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
+    description = "Allow HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -38,10 +22,9 @@ resource "aws_security_group" "allow_http_ssh" {
 }
 
 resource "aws_instance" "web_server" {
-  ami           = "ami-0f5ee92e2d63afc18" # Amazon Linux 2 in ap-south-1
+  ami           = "ami-0f5ee92e2d63afc18"  # Amazon Linux 2 (ap-south-1)
   instance_type = "t2.micro"
-  key_name      = aws_key_pair.deployer.key_name
-  security_groups = [aws_security_group.allow_http_ssh.name]
+  security_groups = [aws_security_group.web_sg.name]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -49,10 +32,12 @@ resource "aws_instance" "web_server" {
               yum install -y httpd
               systemctl start httpd
               systemctl enable httpd
-              echo "${base64encode(file("index.html"))}" | base64 -d > /var/www/html/index.html
+              cat <<EOT > /var/www/html/index.html
+              ${file("index.html")}
+              EOT
               EOF
 
   tags = {
-    Name = "HTMLServer"
+    Name = "SimpleHTMLServer"
   }
 }
